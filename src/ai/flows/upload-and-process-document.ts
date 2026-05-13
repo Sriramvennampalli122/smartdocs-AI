@@ -69,11 +69,17 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     formData.append('file', new Blob([fileBuffer], { type: mimeType }), 'document.pdf');
 
     try {
+      // Use a controller to set a reasonable timeout for the connection
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for heavy processing
+
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
-        // Increased timeout implicitly handled by Node.js, but let's be careful with connection
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         let errorDetail = '';
@@ -105,11 +111,15 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
         message: error.message,
         url: uploadEndpoint,
         cause: error.cause,
-        stack: error.stack
+        code: error.code
       });
       
-      if (error.message.includes('fetch failed')) {
-        throw new Error(`Connection failed to ${uploadEndpoint}. Is the Python backend running at that address?`);
+      if (error.name === 'AbortError') {
+        throw new Error(`Connection timed out while reaching ${uploadEndpoint}. The document might be too large or the backend is slow.`);
+      }
+      
+      if (error.message.includes('fetch failed') || error.code === 'ECONNREFUSED') {
+        throw new Error(`Connection refused: Could not reach the backend at ${uploadEndpoint}. Please ensure your Python FastAPI server is running at this address.`);
       }
       
       throw new Error(`Document upload failed: ${error.message}`);

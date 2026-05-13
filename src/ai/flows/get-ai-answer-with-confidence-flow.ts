@@ -82,9 +82,15 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
       console.error('Error fetching AI answer from backend:', {
         message: error.message,
         url: askEndpoint,
-        cause: error.cause
+        cause: error.cause,
+        code: error.code
       });
-      throw new Error(`Failed to get AI answer from ${askEndpoint}. Is the backend running?`);
+      
+      if (error.message.includes('fetch failed') || error.code === 'ECONNREFUSED') {
+        throw new Error(`Connection failed to ${askEndpoint}. Please ensure your Python backend is running at that address.`);
+      }
+      
+      throw new Error(`Failed to get AI answer from ${askEndpoint}: ${error.message}`);
     }
   }
 );
