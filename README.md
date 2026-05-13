@@ -3,31 +3,38 @@
 
 SmartDoc AI is a production-grade RAG (Retrieval-Augmented Generation) document Q&A assistant designed for high-precision information retrieval with integrated hallucination detection.
 
+## 🛠 Prerequisites
+
+You need **Python 3.8 or higher** installed on your system.
+
+### How to install Python:
+- **macOS**: `brew install python` (or download from python.org)
+- **Windows**: Download the installer from [python.org](https://www.python.org/downloads/) (Make sure to check "Add Python to PATH").
+- **Linux (Ubuntu/Debian)**: `sudo apt update && sudo apt install python3 python3-pip`
+
 ## 🚀 Getting Started
 
-To run the complete system, you need to start both the Frontend and the Backend. **You will need two terminal tabs open.**
+To run the complete system, follow these steps:
 
-### 1. Start the Backend (Python)
+### 1. Install Backend Dependencies
+Open a terminal and run:
+```bash
+pip install -r backend/requirements.txt
+```
+
+### 2. Start the Backend (Python)
 In your first terminal tab, run:
 ```bash
 npm run backend
 ```
-*Note: If you get "command not found", ensure Python is installed and try running `python3 backend/main.py` directly.*
+*Note: This script tries `python3` first, then `python`. If both fail, ensure Python is installed and in your PATH.*
 
-The backend will start on `http://0.0.0.0:8000`. You should see a message saying "Uvicorn running on...".
-
-### 2. Start the Frontend (Next.js)
+### 3. Start the Frontend (Next.js)
 In a second terminal tab, run:
 ```bash
 npm run dev
 ```
 The frontend will be available on `http://localhost:9002`.
-
-## 🛠 Tech Stack
-
-- **Frontend**: Next.js 15, Tailwind CSS, Lucide Icons, ShadCN UI.
-- **AI/LLM**: Genkit, Google Gemini (via `@genkit-ai/google-genai`).
-- **Backend**: FastAPI (Python), Uvicorn.
 
 ## ⚙️ Configuration
 Ensure your `.env` file contains:
