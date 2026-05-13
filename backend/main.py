@@ -1,7 +1,8 @@
+
 import os
 import uuid
 import logging
-from typing import List, Optional
+from typing import List
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +17,6 @@ logger = logging.getLogger("smartdoc-ai")
 app = FastAPI(title="SmartDoc AI Backend")
 
 # Enable CORS for Next.js frontend
-# This is critical to allow the frontend to communicate with this server
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,7 +26,6 @@ app.add_middleware(
 )
 
 # In-memory storage for demo purposes
-# Note: This will reset if the server restarts
 document_store = {}
 
 class QuestionRequest(BaseModel):
@@ -58,17 +57,13 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     
     try:
-        # Generate a unique ID for the document
         doc_id = str(uuid.uuid4())
-        
-        # Read the file content
         content = await file.read()
         file_size = len(content)
         
-        # Simulate RAG processing logic (e.g., 1 chunk per 1KB of content)
+        # Simulate RAG processing logic
         chunk_count = max(1, file_size // 1024)
         
-        # Store metadata in our temporary document store
         document_store[doc_id] = {
             "name": file.filename,
             "chunks": chunk_count,
@@ -90,28 +85,27 @@ async def ask_question(request: QuestionRequest):
     logger.info(f"Received question for document {request.doc_id}: {request.question}")
     
     if request.doc_id not in document_store:
-        logger.error(f"Document ID {request.doc_id} not found in memory store")
+        logger.error(f"Document ID {request.doc_id} not found")
         raise HTTPException(
             status_code=404, 
-            detail="Document not found. The server may have restarted. Please re-upload your document."
+            detail="Document not found. Please re-upload your document."
         )
     
     doc_info = document_store[request.doc_id]
     
-    # Simulation of a RAG retrieval and confidence scoring engine
     return AskResponse(
-        answer=f"Based on the analyzed text in '{doc_info['name']}', the answer to your question '{request.question}' is found across several sections. This response was generated using the RAG pipeline chunks.",
+        answer=f"Based on the analyzed text in '{doc_info['name']}', the answer to your question '{request.question}' is that this is a simulated RAG response. In a production system, this would be extracted from the indexed chunks.",
         confidence=0.92,
         confidence_label="High",
         hallucination_risk="Safe",
         sources=[
-            Source(text=f"Found a relevant section in '{doc_info['name']}' discussing the topic of the query.", page=1),
-            Source(text="Supporting data points extracted from the document's primary tables and figures.", page=3)
+            Source(text=f"Supporting information found in '{doc_info['name']}' regarding {request.question}.", page=1),
+            Source(text="Additional contextual data extracted from the document chunks.", page=2)
         ]
     )
 
 if __name__ == "__main__":
     import uvicorn
     # Use 127.0.0.1 for local communication from the Next.js server
-    logger.info("SmartDoc AI Backend starting on http://127.0.0.1:8000")
+    logger.info("Starting SmartDoc AI Backend...")
     uvicorn.run(app, host="127.0.0.1", port=8000)
