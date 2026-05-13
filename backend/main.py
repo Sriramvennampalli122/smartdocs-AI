@@ -18,7 +18,6 @@ app.add_middleware(
 )
 
 # In-memory storage for demo purposes
-# In a real app, this would use ChromaDB and LangChain
 document_store = {}
 
 class QuestionRequest(BaseModel):
@@ -66,6 +65,7 @@ async def upload_document(file: UploadFile = File(...)):
             "chunks": chunk_count
         }
     except Exception as e:
+        print(f"[Backend] Upload Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ask", response_model=AskResponse)
@@ -74,7 +74,6 @@ async def ask_question(request: QuestionRequest):
         raise HTTPException(status_code=404, detail="Document not found.")
     
     # Simulate RAG retrieval and confidence scoring
-    # In production, this would use a VectorDB lookup and LLM generation
     return AskResponse(
         answer=f"Based on the document '{document_store[request.doc_id]['name']}', the answer to '{request.question}' is found in the analyzed chunks. This is a simulated response from the FastAPI backend.",
         confidence=0.92,
@@ -82,11 +81,12 @@ async def ask_question(request: QuestionRequest):
         hallucination_risk="Safe",
         sources=[
             Source(text="This is a simulated source passage extracted from the document content.", page=1),
-            Source(text="Another relevant passage from a different section of the PDF.", page(3))
+            Source(text="Another relevant passage from a different section of the PDF.", page=3)
         ]
     )
 
 if __name__ == "__main__":
     import uvicorn
-    # Bind to 127.0.0.1:8000
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # Bind to 0.0.0.0 to ensure accessibility within the workstation environment
+    print("[SmartDoc AI] Starting FastAPI on http://0.0.0.0:8000")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
