@@ -31,18 +31,11 @@ export type UploadAndProcessDocumentOutput = z.infer<typeof UploadAndProcessDocu
  * Helper function to parse a data URI into its MIME type and base64 encoded data.
  */
 function parseDataUri(dataUri: string): { mimeType: string, base64Data: string } {
-  const parts = dataUri.split(',');
-  if (parts.length !== 2) {
-    throw new Error('Invalid data URI format');
+  const matches = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) {
+    throw new Error('Invalid data URI format. Expected "data:<mime>;base64,<data>"');
   }
-  const meta = parts[0];
-  const base64Data = parts[1];
-  const mimeMatch = meta.match(/data:(.*?);base64/);
-  if (!mimeMatch || mimeMatch.length < 2) {
-    throw new Error('Invalid data URI: MIME type not found');
-  }
-  const mimeType = mimeMatch[1];
-  return { mimeType, base64Data };
+  return { mimeType: matches[1], base64Data: matches[2] };
 }
 
 /**
@@ -61,29 +54,25 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     outputSchema: UploadAndProcessDocumentOutputSchema,
   },
   async (input) => {
-    const rawBackendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000';
-    // Ensure no trailing slash for consistency
+    // Default to 127.0.0.1 to avoid IPv6 resolution issues with Node.js fetch
+    const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
     const backendApiUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
     const uploadEndpoint = `${backendApiUrl}/upload`;
 
     const { mimeType, base64Data } = parseDataUri(input.pdfDataUri);
 
-    // Convert base64 to a Uint8Array for the Blob
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
+    // Use Buffer for cleaner base64 processing in Node.js server context
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+    
     const formData = new FormData();
     // The backend expects a file named 'file'
-    formData.append('file', new Blob([bytes], { type: mimeType }), 'document.pdf');
+    formData.append('file', new Blob([fileBuffer], { type: mimeType }), 'document.pdf');
 
     try {
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
-        // Let the browser/node set the Content-Type header with the boundary
+        // Body size limit is handled by next.config.ts
       });
 
       if (!response.ok) {
@@ -103,18 +92,21 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
         throw new Error(result.message || result.error || 'Backend reported an error');
       }
 
-      // Handle potential snake_case/camelCase variants from different FastAPI implementations
       const docId = result.doc_id || result.docId;
       const chunks = result.chunks ?? result.num_chunks ?? result.chunk_count ?? 0;
 
       if (!docId) {
-        throw new Error('Backend failed to return a document ID');
+        throw new Error('Backend successfully processed but failed to return a document ID');
       }
 
       return { docId, chunks };
     } catch (error: any) {
-      console.error('Document Processing Flow Error:', error);
-      throw new Error(error.message || 'Connection to backend failed');
+      console.error('Document Processing Flow Error:', {
+        message: error.message,
+        url: uploadEndpoint,
+        cause: error.cause
+      });
+      throw new Error(`Failed to connect to backend at ${uploadEndpoint}. Ensure your backend API is running and reachable.`);
     }
   }
 );

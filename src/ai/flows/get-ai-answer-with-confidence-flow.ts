@@ -46,10 +46,13 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
     outputSchema: GetAiAnswerWithConfidenceOutputSchema,
   },
   async (input) => {
-    const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8000';
+    // Default to 127.0.0.1 to avoid IPv6 resolution issues with Node.js fetch
+    const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
+    const backendApiUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
+    const askEndpoint = `${backendApiUrl}/ask`;
     
     try {
-      const response = await fetch(`${BACKEND_API_URL}/ask`, {
+      const response = await fetch(askEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,9 +78,13 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
           page: s.page ?? s.page_number ?? 1
         })),
       };
-    } catch (error) {
-      console.error('Error fetching AI answer from backend:', error);
-      throw new Error(`Failed to get AI answer: ${error instanceof Error ? error.message : String(error)}`);
+    } catch (error: any) {
+      console.error('Error fetching AI answer from backend:', {
+        message: error.message,
+        url: askEndpoint,
+        cause: error.cause
+      });
+      throw new Error(`Failed to get AI answer from ${askEndpoint}. Is the backend running?`);
     }
   }
 );
