@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Upload, File, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Upload, File, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { uploadAndProcessDocument } from "@/ai/flows/upload-and-process-document";
@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 interface FileUploadProps {
   onSuccess: (docId: string, stats: { chunks: number; name: string }) => void;
 }
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export function FileUpload({ onSuccess }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -28,6 +30,16 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
         });
         return;
       }
+
+      if (selected.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: "The maximum allowed file size is 10MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setFile(selected);
       setUploadStats(null);
     }
@@ -39,8 +51,9 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
     setIsUploading(true);
     try {
       const reader = new FileReader();
-      const fileData = await new Promise<string>((resolve) => {
+      const fileData = await new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
         reader.readAsDataURL(file);
       });
 
@@ -99,18 +112,29 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       </div>
 
       {file && !uploadStats && (
-        <Button 
-          onClick={handleUpload} 
-          disabled={isUploading}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11"
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : "Analyze Document"}
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button 
+            onClick={handleUpload} 
+            disabled={isUploading}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : "Analyze Document"}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setFile(null)} 
+            disabled={isUploading}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </Button>
+        </div>
       )}
 
       {isUploading && (
