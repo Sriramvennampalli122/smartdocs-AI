@@ -72,7 +72,7 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
-        // Body size limit is handled by next.config.ts
+        // Increased timeout implicitly handled by Node.js, but let's be careful with connection
       });
 
       if (!response.ok) {
@@ -104,9 +104,15 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
       console.error('Document Processing Flow Error:', {
         message: error.message,
         url: uploadEndpoint,
-        cause: error.cause
+        cause: error.cause,
+        stack: error.stack
       });
-      throw new Error(`Failed to connect to backend at ${uploadEndpoint}. Ensure your backend API is running and reachable.`);
+      
+      if (error.message.includes('fetch failed')) {
+        throw new Error(`Connection failed to ${uploadEndpoint}. Is the Python backend running at that address?`);
+      }
+      
+      throw new Error(`Document upload failed: ${error.message}`);
     }
   }
 );
