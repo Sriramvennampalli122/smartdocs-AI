@@ -11,7 +11,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { Buffer } from 'buffer'; // Explicit import for Buffer
 
 const UploadAndProcessDocumentInputSchema = z.object({
   pdfDataUri: z
@@ -30,9 +29,6 @@ export type UploadAndProcessDocumentOutput = z.infer<typeof UploadAndProcessDocu
 
 /**
  * Helper function to parse a data URI into its MIME type and base64 encoded data.
- * @param dataUri The data URI string.
- * @returns An object containing the MIME type and base64 data.
- * @throws Error if the data URI format is invalid.
  */
 function parseDataUri(dataUri: string): { mimeType: string, base64Data: string } {
   const parts = dataUri.split(',');
@@ -51,9 +47,6 @@ function parseDataUri(dataUri: string): { mimeType: string, base64Data: string }
 
 /**
  * Uploads a PDF document to the backend FastAPI service for processing and indexing.
- * @param input Contains the PDF document as a data URI.
- * @returns The document ID and the number of chunks indexed.
- * @throws Error if the upload or processing fails.
  */
 export async function uploadAndProcessDocument(
   input: UploadAndProcessDocumentInput
@@ -68,54 +61,60 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     outputSchema: UploadAndProcessDocumentOutputSchema,
   },
   async (input) => {
-    const backendApiUrl = process.env.BACKEND_API_URL || 'http://localhost:8000';
+    const rawBackendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000';
+    // Ensure no trailing slash for consistency
+    const backendApiUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
     const uploadEndpoint = `${backendApiUrl}/upload`;
 
     const { mimeType, base64Data } = parseDataUri(input.pdfDataUri);
 
-    // Convert base64 string to Buffer
-    const buffer = Buffer.from(base64Data, 'base64');
+    // Convert base64 to a Uint8Array for the Blob
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
 
-    // Create a FormData object to send the file as multipart/form-data.
-    // In a Next.js server action/Genkit server environment, FormData and Blob are typically available globally.
     const formData = new FormData();
-    // The backend expects a file named 'file' as per FastAPI specification for file uploads.
-    formData.append('file', new Blob([buffer], { type: mimeType }), 'document.pdf'); // 'document.pdf' is a placeholder filename
+    // The backend expects a file named 'file'
+    formData.append('file', new Blob([bytes], { type: mimeType }), 'document.pdf');
 
     try {
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
-        // When using FormData, fetch automatically sets the 'Content-Type': 'multipart/form-data'
-        // header with the correct boundary. Do not set it manually.
+        // Let the browser/node set the Content-Type header with the boundary
       });
 
       if (!response.ok) {
-        let errorText = `Backend API error: ${response.status} - ${response.statusText}`;
+        let errorDetail = '';
         try {
-          // Attempt to parse JSON error message if available
           const errorJson = await response.json();
-          errorText = errorJson.detail || JSON.stringify(errorJson);
-        } catch (jsonError) {
-          // Fallback to plain text if JSON parsing fails
-          errorText = await response.text();
+          errorDetail = errorJson.detail || JSON.stringify(errorJson);
+        } catch {
+          errorDetail = await response.text();
         }
-        throw new Error(`Failed to upload and process document: ${errorText}`);
+        throw new Error(`Backend Error (${response.status}): ${errorDetail}`);
       }
 
       const result = await response.json();
 
-      if (result.status !== 'success') {
-        throw new Error(`Backend returned non-success status: ${JSON.stringify(result)}`);
+      if (result.status === 'error' || result.error) {
+        throw new Error(result.message || result.error || 'Backend reported an error');
       }
 
-      return {
-        docId: result.doc_id,
-        chunks: result.chunks,
-      };
+      // Handle potential snake_case/camelCase variants from different FastAPI implementations
+      const docId = result.doc_id || result.docId;
+      const chunks = result.chunks ?? result.num_chunks ?? result.chunk_count ?? 0;
+
+      if (!docId) {
+        throw new Error('Backend failed to return a document ID');
+      }
+
+      return { docId, chunks };
     } catch (error: any) {
-      console.error('Error uploading document to backend:', error);
-      throw new Error(`Failed to upload and process document: ${error.message}`);
+      console.error('Document Processing Flow Error:', error);
+      throw new Error(error.message || 'Connection to backend failed');
     }
   }
 );
