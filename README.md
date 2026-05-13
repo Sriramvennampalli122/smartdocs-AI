@@ -1,3 +1,4 @@
+
 # SmartDoc AI
 
 SmartDoc AI is a production-grade RAG (Retrieval-Augmented Generation) document Q&A assistant designed for high-precision information retrieval with integrated hallucination detection.
@@ -11,9 +12,9 @@ In your first terminal tab, run:
 ```bash
 npm run backend
 ```
-*Alternatively, you can run:* `python backend/main.py`
+*Note: If you get "command not found", ensure Python is installed and try running `python3 backend/main.py` directly.*
 
-The backend will start on `http://127.0.0.1:8000`. You should see a message saying "Uvicorn running on...".
+The backend will start on `http://0.0.0.0:8000`. You should see a message saying "Uvicorn running on...".
 
 ### 2. Start the Frontend (Next.js)
 In a second terminal tab, run:

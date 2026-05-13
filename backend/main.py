@@ -62,6 +62,7 @@ async def upload_document(file: UploadFile = File(...)):
         file_size = len(content)
         
         # Simulate RAG processing logic
+        # For demo purposes, we treat every KB as a "chunk"
         chunk_count = max(1, file_size // 1024)
         
         document_store[doc_id] = {
@@ -106,6 +107,6 @@ async def ask_question(request: QuestionRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    # Use 127.0.0.1 for local communication from the Next.js server
+    # Using 0.0.0.0 makes the server reachable across network interfaces
     logger.info("Starting SmartDoc AI Backend...")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
