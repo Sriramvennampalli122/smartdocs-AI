@@ -7,27 +7,40 @@ SmartDoc AI is a production-grade RAG (Retrieval-Augmented Generation) document 
 
 You need **Python 3.8 or higher** installed on your system.
 
-### How to install Python:
-- **macOS**: `brew install python` (or download from python.org)
-- **Windows**: Download the installer from [python.org](https://www.python.org/downloads/) (Make sure to check "Add Python to PATH").
-- **Linux (Ubuntu/Debian)**: `sudo apt update && sudo apt install python3 python3-pip`
+### 1. How to install Python & Pip:
+
+#### **macOS**
+- **Install Python**: Open Terminal and run `brew install python`.
+- **Install Pip**: Pip is included with the Homebrew Python installation. Verify with `pip3 --version`.
+- If you don't have Homebrew: Download the installer from [python.org](https://www.python.org/downloads/macos/).
+
+#### **Windows**
+- **Install Python**: Download the installer from [python.org](https://www.python.org/downloads/windows/).
+- **Crucial**: During installation, check the box that says **"Add Python to PATH"**.
+- **Install Pip**: Pip is included by default. Verify by opening Command Prompt and typing `pip --version`.
+
+#### **Linux (Ubuntu/Debian)**
+- Run: `sudo apt update && sudo apt install python3 python3-pip`
+
+---
 
 ## 🚀 Getting Started
 
 To run the complete system, follow these steps:
 
 ### 1. Install Backend Dependencies
-Open a terminal and run:
+Open a terminal in the project root and run:
 ```bash
 pip install -r backend/requirements.txt
 ```
+*(On some systems, you may need to use `pip3 install...`)*
 
 ### 2. Start the Backend (Python)
 In your first terminal tab, run:
 ```bash
 npm run backend
 ```
-*Note: This script tries `python3` first, then `python`. If both fail, ensure Python is installed and in your PATH.*
+*This starts the FastAPI server at http://127.0.0.1:8000.*
 
 ### 3. Start the Frontend (Next.js)
 In a second terminal tab, run:
