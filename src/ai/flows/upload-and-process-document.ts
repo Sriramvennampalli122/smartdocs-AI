@@ -1,12 +1,9 @@
+
 'use server';
 /**
  * @fileOverview This file defines a Genkit flow for uploading and processing a PDF document.
  * The flow takes a PDF as a data URI, sends it to a backend FastAPI service for RAG processing,
  * and returns the document ID and the number of chunks indexed.
- *
- * - uploadAndProcessDocument - A function that handles the PDF upload and processing.
- * - UploadAndProcessDocumentInput - The input type for the uploadAndProcessDocument function.
- * - UploadAndProcessDocumentOutput - The return type for the uploadAndProcessDocument function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -27,9 +24,6 @@ const UploadAndProcessDocumentOutputSchema = z.object({
 });
 export type UploadAndProcessDocumentOutput = z.infer<typeof UploadAndProcessDocumentOutputSchema>;
 
-/**
- * Helper function to parse a data URI into its MIME type and base64 encoded data.
- */
 function parseDataUri(dataUri: string): { mimeType: string, base64Data: string } {
   const matches = dataUri.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) {
@@ -38,9 +32,6 @@ function parseDataUri(dataUri: string): { mimeType: string, base64Data: string }
   return { mimeType: matches[1], base64Data: matches[2] };
 }
 
-/**
- * Uploads a PDF document to the backend FastAPI service for processing and indexing.
- */
 export async function uploadAndProcessDocument(
   input: UploadAndProcessDocumentInput
 ): Promise<UploadAndProcessDocumentOutput> {
@@ -54,24 +45,21 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     outputSchema: UploadAndProcessDocumentOutputSchema,
   },
   async (input) => {
-    // Default to 127.0.0.1 to avoid IPv6 resolution issues with Node.js fetch
+    // Prefer IPv4 explicitly to avoid DNS resolution issues with 'localhost' in Node.js
     const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
     const backendApiUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
     const uploadEndpoint = `${backendApiUrl}/upload`;
 
     const { mimeType, base64Data } = parseDataUri(input.pdfDataUri);
-
-    // Use Buffer for cleaner base64 processing in Node.js server context
     const fileBuffer = Buffer.from(base64Data, 'base64');
     
     const formData = new FormData();
-    // The backend expects a file named 'file'
+    // The backend expects a file field named 'file'
     formData.append('file', new Blob([fileBuffer], { type: mimeType }), 'document.pdf');
 
     try {
-      // Use a controller to set a reasonable timeout for the connection
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for heavy processing
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s for large uploads
 
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
@@ -94,35 +82,28 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
 
       const result = await response.json();
 
-      if (result.status === 'error' || result.error) {
-        throw new Error(result.message || result.error || 'Backend reported an error');
-      }
-
       const docId = result.doc_id || result.docId;
       const chunks = result.chunks ?? result.num_chunks ?? result.chunk_count ?? 0;
 
       if (!docId) {
-        throw new Error('Backend successfully processed but failed to return a document ID');
+        throw new Error('Document processed but backend failed to return an ID.');
       }
 
       return { docId, chunks };
     } catch (error: any) {
-      console.error('Document Processing Flow Error:', {
-        message: error.message,
-        url: uploadEndpoint,
-        cause: error.cause,
-        code: error.code
-      });
-      
       if (error.name === 'AbortError') {
-        throw new Error(`Connection timed out while reaching ${uploadEndpoint}. The document might be too large or the backend is slow.`);
+        throw new Error(`Upload timed out. The document might be too large for the current backend processing time.`);
       }
       
-      if (error.message.includes('fetch failed') || error.code === 'ECONNREFUSED') {
-        throw new Error(`Connection refused: Could not reach the backend at ${uploadEndpoint}. Please ensure your Python FastAPI server is running at this address.`);
+      // Map common networking errors to helpful advice
+      if (error.code === 'ECONNREFUSED' || error.message.includes('fetch failed')) {
+        throw new Error(
+          `Connection refused: Could not reach the backend at ${uploadEndpoint}. ` +
+          `Please ensure your Python FastAPI server is running (e.g., 'python main.py' or 'uvicorn main:app') and bound to 127.0.0.1:8000.`
+        );
       }
       
-      throw new Error(`Document upload failed: ${error.message}`);
+      throw new Error(`Upload failed: ${error.message}`);
     }
   }
 );
