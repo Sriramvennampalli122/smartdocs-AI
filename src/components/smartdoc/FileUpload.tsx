@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, File, CheckCircle2, Loader2 } from "lucide-react";
+import { Upload, File, CheckCircle2, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { uploadAndProcessDocument } from "@/ai/flows/upload-and-process-document";
@@ -11,7 +11,7 @@ interface FileUploadProps {
   onSuccess: (docId: string, stats: { chunks: number; name: string }) => void;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 
 export function FileUpload({ onSuccess }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -76,6 +76,11 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
     }
   };
 
+  const clearSelection = () => {
+    setFile(null);
+    setUploadStats(null);
+  };
+
   return (
     <div className="space-y-4">
       <div 
@@ -84,20 +89,29 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
           file ? "border-emerald-500/50 bg-emerald-500/5" : "border-border hover:border-emerald-500/30 hover:bg-emerald-500/5"
         )}
       >
-        <input 
-          type="file" 
-          className="absolute inset-0 opacity-0 cursor-pointer" 
-          accept=".pdf"
-          onChange={handleFileChange}
-          disabled={isUploading}
-        />
+        {!file && !isUploading && (
+          <input 
+            type="file" 
+            className="absolute inset-0 opacity-0 cursor-pointer" 
+            accept=".pdf"
+            onChange={handleFileChange}
+          />
+        )}
         
         {file ? (
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center relative w-full">
+            {!isUploading && !uploadStats && (
+              <button 
+                onClick={clearSelection}
+                className="absolute -top-4 -right-4 p-1 bg-muted rounded-full hover:bg-red-500/10 hover:text-red-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
             <div className="p-3 bg-emerald-500/10 rounded-full mb-3">
               <File className="w-8 h-8 text-emerald-500" />
             </div>
-            <p className="font-medium text-sm text-foreground truncate max-w-[200px]">{file.name}</p>
+            <p className="font-medium text-sm text-foreground truncate max-w-full px-4">{file.name}</p>
             <p className="text-xs text-muted-foreground mt-1">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
           </div>
         ) : (
@@ -125,15 +139,16 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
               </>
             ) : "Analyze Document"}
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setFile(null)} 
-            disabled={isUploading}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </Button>
+          {!isUploading && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={clearSelection} 
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       )}
 

@@ -12,8 +12,6 @@ import { z } from 'genkit';
 
 /**
  * Defines the input schema for the getAiAnswerWithConfidence flow.
- * @property {string} question - The user's question about the document.
- * @property {string} docId - The unique identifier of the uploaded document.
  */
 const GetAiAnswerWithConfidenceInputSchema = z.object({
   question: z.string().describe('The user’s question about the document.'),
@@ -23,11 +21,6 @@ export type GetAiAnswerWithConfidenceInput = z.infer<typeof GetAiAnswerWithConfi
 
 /**
  * Defines the output schema for the getAiAnswerWithConfidence flow.
- * @property {string} answer - The AI-generated answer to the question.
- * @property {number} confidence - A numerical confidence score (0.0 to 1.0) for the answer.
- * @property {('High' | 'Medium' | 'Low')} confidenceLabel - A human-readable label for the confidence score.
- * @property {('Safe' | 'Uncertain' | 'Risky')} hallucinationRisk - An assessment of the hallucination risk for the answer.
- * @property {Array<{text: string; page: number}>} sources - An array of source passages from the document used to generate the answer.
  */
 const GetAiAnswerWithConfidenceOutputSchema = z.object({
   answer: z.string().describe('The AI-generated answer to the question.'),
@@ -53,7 +46,6 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
     outputSchema: GetAiAnswerWithConfidenceOutputSchema,
   },
   async (input) => {
-    // Resolve the backend API URL. This should typically be set as an environment variable.
     const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8000';
     
     try {
@@ -62,7 +54,6 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
         headers: {
           'Content-Type': 'application/json',
         },
-        // Backend expects 'doc_id', so map 'docId' from input
         body: JSON.stringify({ question: input.question, doc_id: input.docId }),
       });
 
@@ -71,8 +62,19 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
         throw new Error(`Backend API error: ${response.status} - ${errorData.message || 'Unknown error'}`);
       }
 
-      const data: GetAiAnswerWithConfidenceOutput = await response.json();
-      return data;
+      const result = await response.json();
+      
+      // Robust mapping to handle potential snake_case from FastAPI backend
+      return {
+        answer: result.answer || '',
+        confidence: result.confidence ?? 0,
+        confidenceLabel: (result.confidence_label || result.confidenceLabel || 'Medium') as 'High' | 'Medium' | 'Low',
+        hallucinationRisk: (result.hallucination_risk || result.hallucinationRisk || 'Uncertain') as 'Safe' | 'Uncertain' | 'Risky',
+        sources: (result.sources || []).map((s: any) => ({
+          text: s.text || '',
+          page: s.page ?? s.page_number ?? 1
+        })),
+      };
     } catch (error) {
       console.error('Error fetching AI answer from backend:', error);
       throw new Error(`Failed to get AI answer: ${error instanceof Error ? error.message : String(error)}`);
@@ -80,11 +82,6 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
   }
 );
 
-/**
- * Wrapper function to execute the getAiAnswerWithConfidence Genkit flow.
- * @param {GetAiAnswerWithConfidenceInput} input - The question and document ID.
- * @returns {Promise<GetAiAnswerWithConfidenceOutput>} The AI-generated answer, confidence, risk, and sources.
- */
 export async function getAiAnswerWithConfidence(
   input: GetAiAnswerWithConfidenceInput
 ): Promise<GetAiAnswerWithConfidenceOutput> {
