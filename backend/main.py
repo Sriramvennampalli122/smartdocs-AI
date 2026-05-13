@@ -1,4 +1,3 @@
-
 import os
 import uuid
 import logging
@@ -100,7 +99,6 @@ async def ask_question(request: QuestionRequest):
     doc_info = document_store[request.doc_id]
     
     # Simulation of a RAG retrieval and confidence scoring engine
-    # In production, this would involve embedding retrieval from ChromaDB
     return AskResponse(
         answer=f"Based on the analyzed text in '{doc_info['name']}', the answer to your question '{request.question}' is found across several sections. This response was generated using the RAG pipeline chunks.",
         confidence=0.92,
@@ -114,7 +112,6 @@ async def ask_question(request: QuestionRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    # Bind to 0.0.0.0 to ensure accessibility within the workstation environment
-    # Port 8000 is the expected port for the Next.js frontend
-    logger.info("SmartDoc AI Backend starting on http://0.0.0.0:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Use 127.0.0.1 for local communication from the Next.js server
+    logger.info("SmartDoc AI Backend starting on http://127.0.0.1:8000")
+    uvicorn.run(app, host="127.0.0.1", port=8000)
