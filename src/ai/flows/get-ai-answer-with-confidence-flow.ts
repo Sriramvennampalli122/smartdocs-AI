@@ -71,7 +71,7 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
       if (error.code === 'ECONNREFUSED' || error.message.includes('fetch failed')) {
         throw new Error(
           `CONNECTION REFUSED: Could not reach the backend for analysis at ${askEndpoint}. ` +
-          `Ensure your Python FastAPI server is running on port 8000.`
+          `Check your Python server logs and ensure it is bound to 127.0.0.1:8000.`
         );
       }
       throw new Error(`Analysis failed: ${error.message}`);

@@ -45,7 +45,7 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     outputSchema: UploadAndProcessDocumentOutputSchema,
   },
   async (input) => {
-    // Explicitly fallback to 127.0.0.1 for Node.js fetch reliability
+    // Force IPv4 loopback to avoid Node.js localhost resolution issues
     const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
     const baseUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
     const uploadEndpoint = `${baseUrl}/upload`;
@@ -91,15 +91,13 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
       console.error(`[SmartDoc AI] Upload Error:`, error);
 
       if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-        throw new Error(`The backend at ${baseUrl} took too long to respond. Check your Python logs.`);
+        throw new Error(`The backend at ${baseUrl} took too long to respond (timeout after 120s).`);
       }
 
       if (error.code === 'ECONNREFUSED' || error.message.includes('fetch failed')) {
         throw new Error(
           `CONNECTION REFUSED: Could not reach the backend at ${uploadEndpoint}. ` +
-          `1. Ensure your FastAPI server is running. ` +
-          `2. Check that it is bound to 127.0.0.1:8000. ` +
-          `3. If you are using a custom port, update the BACKEND_API_URL in .env.`
+          `Please ensure your FastAPI server is running and listening on 127.0.0.1:8000.`
         );
       }
       
