@@ -1,0 +1,92 @@
+'use server';
+/**
+ * @fileOverview A Genkit flow for asking questions about an uploaded document and getting an AI-generated answer with a confidence level and source passages.
+ *
+ * - getAiAnswerWithConfidence - A function that handles the document Q&A process with hallucination detection.
+ * - GetAiAnswerWithConfidenceInput - The input type for the getAiAnswerWithConfidence function.
+ * - GetAiAnswerWithConfidenceOutput - The return type for the getAiAnswerWithConfidence function.
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+
+/**
+ * Defines the input schema for the getAiAnswerWithConfidence flow.
+ * @property {string} question - The user's question about the document.
+ * @property {string} docId - The unique identifier of the uploaded document.
+ */
+const GetAiAnswerWithConfidenceInputSchema = z.object({
+  question: z.string().describe('The user’s question about the document.'),
+  docId: z.string().describe('The unique identifier of the uploaded document.'),
+});
+export type GetAiAnswerWithConfidenceInput = z.infer<typeof GetAiAnswerWithConfidenceInputSchema>;
+
+/**
+ * Defines the output schema for the getAiAnswerWithConfidence flow.
+ * @property {string} answer - The AI-generated answer to the question.
+ * @property {number} confidence - A numerical confidence score (0.0 to 1.0) for the answer.
+ * @property {('High' | 'Medium' | 'Low')} confidenceLabel - A human-readable label for the confidence score.
+ * @property {('Safe' | 'Uncertain' | 'Risky')} hallucinationRisk - An assessment of the hallucination risk for the answer.
+ * @property {Array<{text: string; page: number}>} sources - An array of source passages from the document used to generate the answer.
+ */
+const GetAiAnswerWithConfidenceOutputSchema = z.object({
+  answer: z.string().describe('The AI-generated answer to the question.'),
+  confidence: z.number().min(0.0).max(1.0).describe('A numerical confidence score (0.0 to 1.0) for the answer.'),
+  confidenceLabel: z.enum(['High', 'Medium', 'Low']).describe('A human-readable label for the confidence score.'),
+  hallucinationRisk: z.enum(['Safe', 'Uncertain', 'Risky']).describe('An assessment of the hallucination risk for the answer.'),
+  sources: z.array(z.object({
+    text: z.string().describe('The text content of the source chunk.'),
+    page: z.number().int().describe('The page number from which the source chunk was extracted.'),
+  })).describe('An array of source passages from the document used to generate the answer.'),
+});
+export type GetAiAnswerWithConfidenceOutput = z.infer<typeof GetAiAnswerWithConfidenceOutputSchema>;
+
+/**
+ * Defines a Genkit flow to ask a question about an uploaded document, 
+ * retrieve an AI answer, and assess its confidence and hallucination risk 
+ * by calling a backend service.
+ */
+const getAiAnswerWithConfidenceFlow = ai.defineFlow(
+  {
+    name: 'getAiAnswerWithConfidenceFlow',
+    inputSchema: GetAiAnswerWithConfidenceInputSchema,
+    outputSchema: GetAiAnswerWithConfidenceOutputSchema,
+  },
+  async (input) => {
+    // Resolve the backend API URL. This should typically be set as an environment variable.
+    const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8000';
+    
+    try {
+      const response = await fetch(`${BACKEND_API_URL}/ask`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Backend expects 'doc_id', so map 'docId' from input
+        body: JSON.stringify({ question: input.question, doc_id: input.docId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(`Backend API error: ${response.status} - ${errorData.message || 'Unknown error'}`);
+      }
+
+      const data: GetAiAnswerWithConfidenceOutput = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching AI answer from backend:', error);
+      throw new Error(`Failed to get AI answer: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+);
+
+/**
+ * Wrapper function to execute the getAiAnswerWithConfidence Genkit flow.
+ * @param {GetAiAnswerWithConfidenceInput} input - The question and document ID.
+ * @returns {Promise<GetAiAnswerWithConfidenceOutput>} The AI-generated answer, confidence, risk, and sources.
+ */
+export async function getAiAnswerWithConfidence(
+  input: GetAiAnswerWithConfidenceInput
+): Promise<GetAiAnswerWithConfidenceOutput> {
+  return getAiAnswerWithConfidenceFlow(input);
+}
