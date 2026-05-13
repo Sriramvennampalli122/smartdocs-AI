@@ -45,10 +45,12 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     outputSchema: UploadAndProcessDocumentOutputSchema,
   },
   async (input) => {
-    // Prefer IPv4 explicitly to avoid DNS resolution issues with 'localhost' in Node.js
+    // Explicitly fallback to 127.0.0.1 for Node.js fetch reliability
     const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
-    const backendApiUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
-    const uploadEndpoint = `${backendApiUrl}/upload`;
+    const baseUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
+    const uploadEndpoint = `${baseUrl}/upload`;
+
+    console.log(`[SmartDoc AI] Attempting upload to: ${uploadEndpoint}`);
 
     const { mimeType, base64Data } = parseDataUri(input.pdfDataUri);
     const fileBuffer = Buffer.from(base64Data, 'base64');
@@ -58,16 +60,12 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     formData.append('file', new Blob([fileBuffer], { type: mimeType }), 'document.pdf');
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s for large uploads
-
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
-        signal: controller.signal,
+        // Increase timeout for slow processing environments
+        signal: AbortSignal.timeout(120000), 
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         let errorDetail = '';
@@ -77,11 +75,10 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
         } catch {
           errorDetail = await response.text();
         }
-        throw new Error(`Backend Error (${response.status}): ${errorDetail}`);
+        throw new Error(`Backend Response Error (${response.status}): ${errorDetail}`);
       }
 
       const result = await response.json();
-
       const docId = result.doc_id || result.docId;
       const chunks = result.chunks ?? result.num_chunks ?? result.chunk_count ?? 0;
 
@@ -91,19 +88,22 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
 
       return { docId, chunks };
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        throw new Error(`Upload timed out. The document might be too large for the current backend processing time.`);
+      console.error(`[SmartDoc AI] Upload Error:`, error);
+
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        throw new Error(`The backend at ${baseUrl} took too long to respond. Check your Python logs.`);
       }
-      
-      // Map common networking errors to helpful advice
+
       if (error.code === 'ECONNREFUSED' || error.message.includes('fetch failed')) {
         throw new Error(
-          `Connection refused: Could not reach the backend at ${uploadEndpoint}. ` +
-          `Please ensure your Python FastAPI server is running (e.g., 'python main.py' or 'uvicorn main:app') and bound to 127.0.0.1:8000.`
+          `CONNECTION REFUSED: Could not reach the backend at ${uploadEndpoint}. ` +
+          `1. Ensure your FastAPI server is running. ` +
+          `2. Check that it is bound to 127.0.0.1:8000. ` +
+          `3. If you are using a custom port, update the BACKEND_API_URL in .env.`
         );
       }
       
-      throw new Error(`Upload failed: ${error.message}`);
+      throw new Error(`Failed to upload: ${error.message}`);
     }
   }
 );

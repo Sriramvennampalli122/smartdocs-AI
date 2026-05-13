@@ -33,9 +33,11 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
   },
   async (input) => {
     const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
-    const backendApiUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
-    const askEndpoint = `${backendApiUrl}/ask`;
+    const baseUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
+    const askEndpoint = `${baseUrl}/ask`;
     
+    console.log(`[SmartDoc AI] Sending query to: ${askEndpoint}`);
+
     try {
       const response = await fetch(askEndpoint, {
         method: 'POST',
@@ -43,11 +45,12 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ question: input.question, doc_id: input.docId }),
+        signal: AbortSignal.timeout(60000), // 60s timeout for RAG search
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(`Backend Error (${response.status}): ${errorData.message || 'Unknown error'}`);
+        throw new Error(`Backend Response Error (${response.status}): ${errorData.message || 'Unknown error'}`);
       }
 
       const result = await response.json();
@@ -63,10 +66,12 @@ const getAiAnswerWithConfidenceFlow = ai.defineFlow(
         })),
       };
     } catch (error: any) {
+      console.error(`[SmartDoc AI] Query Error:`, error);
+
       if (error.code === 'ECONNREFUSED' || error.message.includes('fetch failed')) {
         throw new Error(
-          `Could not reach backend for analysis at ${askEndpoint}. ` +
-          `Check if your FastAPI server is running at port 8000.`
+          `CONNECTION REFUSED: Could not reach the backend for analysis at ${askEndpoint}. ` +
+          `Ensure your Python FastAPI server is running on port 8000.`
         );
       }
       throw new Error(`Analysis failed: ${error.message}`);
