@@ -1,58 +1,52 @@
 
-# SmartDoc AI
+# SmartDoc AI - Execution Guide
 
-SmartDoc AI is a production-grade RAG (Retrieval-Augmented Generation) document Q&A assistant designed for high-precision information retrieval with integrated hallucination detection.
+SmartDoc AI uses a dual-stack architecture: **FastAPI (Python)** for heavy document processing and **Next.js (React)** for the AI-powered user interface.
 
-## 🛠 Prerequisites
+## 🚀 How to run the application
 
-You need **Python 3.8 or higher** installed on your system.
+Follow these steps exactly to get the system online:
 
-### 1. How to install Python & Pip:
+### Step 1: Initialize the Backend Environment
+1. Open a **new terminal** in this workspace.
+2. Install the Python dependencies by running:
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
 
-#### **macOS**
-- **Install Python**: Open Terminal and run `brew install python`.
-- **Install Pip**: Pip is included with the Homebrew Python installation. Verify with `pip3 --version`.
-- If you don't have Homebrew: Download the installer from [python.org](https://www.python.org/downloads/macos/).
-
-#### **Windows**
-- **Install Python**: Download the installer from [python.org](https://www.python.org/downloads/windows/).
-- **Crucial**: During installation, check the box that says **"Add Python to PATH"**.
-- **Install Pip**: Pip is included by default. Verify by opening Command Prompt and typing `pip --version`.
-
-#### **Linux (Ubuntu/Debian)**
-- Run: `sudo apt update && sudo apt install python3 python3-pip`
-
----
-
-## 🚀 Getting Started
-
-To run the complete system, follow these steps:
-
-### 1. Install Backend Dependencies
-Open a terminal in the project root and run:
-```bash
-pip install -r backend/requirements.txt
-```
-*(On some systems, you may need to use `pip3 install...`)*
-
-### 2. Start the Backend (Python)
-In your first terminal tab, run:
+### Step 2: Start the FastAPI Server
+In the **same terminal** where you installed dependencies, start the backend:
 ```bash
 npm run backend
 ```
-*This starts the FastAPI server at http://127.0.0.1:8000.*
+*You should see a message saying "INFO: Starting FastAPI server on http://0.0.0.0:8000". Keep this terminal open!*
 
-### 3. Start the Frontend (Next.js)
-In a second terminal tab, run:
-```bash
-npm run dev
-```
-The frontend will be available on `http://localhost:9002`.
-
-## ⚙️ Configuration
-Ensure your `.env` file contains:
-- `GEMINI_API_KEY`: Your Google AI API Key.
-- `BACKEND_API_URL`: `http://127.0.0.1:8000`
+### Step 3: Start the Frontend UI
+1. Open a **second terminal tab**.
+2. Start the Next.js development server:
+   ```bash
+   npm run dev
+   ```
+3. Click the link provided in the terminal (usually `http://localhost:9002`) to open the app.
 
 ---
-Built with Precision by **SmartDoc AI Team**.
+
+## 🛠 Troubleshooting Connection Issues
+
+If you see "Connection Failed" or "FastAPI server is not responding":
+1. **Check the Backend Terminal**: Ensure there are no red error messages. If Python is missing, follow the installation guides in the next section.
+2. **Verify 127.0.0.1**: The frontend is configured to talk to `http://127.0.0.1:8000`. Ensure no other service is occupying port 8000.
+3. **API Key**: Ensure your Google AI API Key is correctly set in the `.env` file.
+
+---
+
+## 📦 Prerequisites & Installation
+
+### Python & Pip Setup
+- **macOS**: `brew install python`
+- **Windows**: Download from [python.org](https://www.python.org/downloads/). **Check "Add Python to PATH" during install.**
+- **Linux**: `sudo apt update && sudo apt install python3 python3-pip`
+
+### System Capacities
+- **Max File Size**: 10MB (PDF only).
+- **Processing Time**: Large files may take 30-60 seconds to index.
