@@ -43,32 +43,30 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
     outputSchema: UploadAndProcessDocumentOutputSchema,
   },
   async (input) => {
-    // We explicitly use 127.0.0.1 to avoid IPv6 resolution issues in Node.js
+    // Explicitly target 127.0.0.1 for local FastAPI connection reliability
     const backendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
     const uploadEndpoint = `${backendUrl.replace(/\/$/, '')}/upload`;
 
-    console.log(`[SmartDoc AI] Connecting to backend at: ${uploadEndpoint}`);
+    console.log(`[SmartDoc AI] Attempting upload to: ${uploadEndpoint}`);
 
     try {
       const { mimeType, base64Data } = parseDataUri(input.pdfDataUri);
       const fileBuffer = Buffer.from(base64Data, 'base64');
       
       const formData = new FormData();
-      // Using a standard Blob with type information
       const blob = new Blob([fileBuffer], { type: mimeType });
       formData.append('file', blob, 'document.pdf');
 
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
-        // Increased timeout to 2.5 minutes for large PDFs
-        signal: AbortSignal.timeout(150000),
+        // 5-minute timeout for large documents (10MB+)
+        signal: AbortSignal.timeout(300000),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[SmartDoc AI] Backend Error ${response.status}:`, errorText);
-        throw new Error(`Backend reached but returned error (${response.status}): ${errorText}`);
+        throw new Error(`Backend Error (${response.status}): ${errorText}`);
       }
 
       const result = await response.json();
@@ -77,16 +75,16 @@ const uploadAndProcessDocumentFlow = ai.defineFlow(
         chunks: result.chunks ?? result.chunk_count ?? 0
       };
     } catch (error: any) {
-      console.error(`[SmartDoc AI] Connection failed to ${uploadEndpoint}:`, error.message);
+      console.error(`[SmartDoc AI] Upload Connection Error:`, error.message);
       
       if (error.name === 'TimeoutError') {
-        throw new Error('Upload timed out. The backend is taking too long to respond.');
+        throw new Error('Upload timed out. Large files may require a faster connection or more backend resources.');
       }
       
       if (error.message.includes('fetch failed') || error.code === 'ECONNREFUSED') {
         throw new Error(
-          `COULD NOT REACH BACKEND: Please ensure your FastAPI server is running at ${backendUrl}. ` +
-          `Verify it's started with 'python backend/main.py'.`
+          `CONNECTION REFUSED: The FastAPI server at ${uploadEndpoint} is not responding. ` +
+          `Please run 'npm run backend' in a separate terminal tab.`
         );
       }
       

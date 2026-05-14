@@ -2,19 +2,19 @@
 import os
 import uuid
 import logging
-from typing import List
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from typing import List, Optional
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
-# Configure logging to provide clear diagnostics in the console
+# Configure logging for better diagnostics
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("smartdoc-ai")
+logger = logging.getLogger("smartdoc-ai-backend")
 
-app = FastAPI(title="SmartDoc AI Backend")
+app = FastAPI(title="SmartDoc AI Backend", version="1.0.0")
 
 # Enable CORS for Next.js frontend
 app.add_middleware(
@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for demo purposes
+# In-memory storage for document metadata
 document_store = {}
 
 class QuestionRequest(BaseModel):
@@ -45,24 +45,24 @@ class AskResponse(BaseModel):
 
 @app.get("/")
 async def root():
-    logger.info("Health check endpoint called")
-    return {"status": "online", "message": "SmartDoc AI FastAPI is running"}
+    logger.info("Health check requested")
+    return {"status": "online", "message": "SmartDoc AI FastAPI Backend is active"}
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
-    logger.info(f"Received upload request for: {file.filename}")
+    logger.info(f"Received upload request: {file.filename}")
     
     if not file.filename.lower().endswith(".pdf"):
-        logger.warning(f"Rejected non-PDF file: {file.filename}")
+        logger.warning(f"Rejected unsupported file type: {file.filename}")
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     
     try:
         doc_id = str(uuid.uuid4())
+        # We read the file to simulate processing
         content = await file.read()
         file_size = len(content)
         
-        # Simulate RAG processing logic
-        # For demo purposes, we treat every KB as a "chunk"
+        # Simple heuristic for "chunks" based on size (1KB per chunk)
         chunk_count = max(1, file_size // 1024)
         
         document_store[doc_id] = {
@@ -71,42 +71,45 @@ async def upload_document(file: UploadFile = File(...)):
             "size": file_size
         }
         
-        logger.info(f"Successfully processed {file.filename}. Assigned ID: {doc_id}, Chunks: {chunk_count}")
+        logger.info(f"Successfully indexed document {doc_id} with {chunk_count} chunks.")
         
         return {
             "doc_id": doc_id,
-            "chunks": chunk_count
+            "chunks": chunk_count,
+            "filename": file.filename
         }
     except Exception as e:
-        logger.error(f"Failed to process upload: {str(e)}")
+        logger.error(f"Error processing upload: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @app.post("/ask", response_model=AskResponse)
 async def ask_question(request: QuestionRequest):
-    logger.info(f"Received question for document {request.doc_id}: {request.question}")
+    logger.info(f"Received question for doc {request.doc_id}: {request.question}")
     
     if request.doc_id not in document_store:
-        logger.error(f"Document ID {request.doc_id} not found")
+        logger.error(f"Document ID {request.doc_id} not found in store")
         raise HTTPException(
             status_code=404, 
-            detail="Document not found. Please re-upload your document."
+            detail="Document not found. Please upload the file again."
         )
     
     doc_info = document_store[request.doc_id]
     
+    # Simulate a sophisticated RAG response
+    # In a real system, this is where your Vector Search and LLM logic would live
     return AskResponse(
-        answer=f"Based on the analyzed text in '{doc_info['name']}', the answer to your question '{request.question}' is that this is a simulated RAG response. In a production system, this would be extracted from the indexed chunks.",
-        confidence=0.92,
+        answer=f"Based on the content of '{doc_info['name']}', the answer to your question about '{request.question}' is found in the analyzed chunks. This is a simulated RAG response providing context extracted from the {doc_info['chunks']} chunks available in the knowledge base.",
+        confidence=0.89,
         confidence_label="High",
         hallucination_risk="Safe",
         sources=[
-            Source(text=f"Supporting information found in '{doc_info['name']}' regarding {request.question}.", page=1),
-            Source(text="Additional contextual data extracted from the document chunks.", page=2)
+            Source(text=f"Primary context regarding '{request.question}' found in section 1.2.", page=1),
+            Source(text=f"Supporting data regarding the document metrics and metadata.", page=2)
         ]
     )
 
 if __name__ == "__main__":
     import uvicorn
-    # Using 0.0.0.0 makes the server reachable across network interfaces
-    logger.info("Starting SmartDoc AI Backend...")
+    # Bind to 0.0.0.0 to ensure connectivity in various environments
+    logger.info("Starting FastAPI server on http://0.0.0.0:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

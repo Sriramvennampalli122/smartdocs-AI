@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
+      // 20MB limit accommodates 10MB PDFs with Base64 overhead
       bodySizeLimit: '20mb',
     },
   },
