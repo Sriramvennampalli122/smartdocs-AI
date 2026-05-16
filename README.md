@@ -2,6 +2,8 @@
 # SmartDoc AI - Execution Guide
 
 SmartDoc AI uses a dual-stack architecture: **FastAPI (Python)** for heavy document processing and **Next.js (React)** for the AI-powered user interface.
+#DEMO video
+https://drive.google.com/file/d/1K0eMqxE2Tv2d_8dnGt2rHGPV6vjMmJbN/view?usp=drive_link
 
 ## 🚀 How to run the application
 
