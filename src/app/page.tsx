@@ -51,7 +51,7 @@ export default function SmartDocPage() {
                     </div>
                     <div className="bg-background/50 rounded-lg p-3 border border-border/50">
                       <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Engine</p>
-                      <p className="text-lg font-headline font-bold text-foreground">GPT-3.5</p>
+                      <p className="text-lg font-headline font-bold text-foreground">LLaMA 3.3</p>
                     </div>
                   </div>
                 </div>
@@ -62,12 +62,16 @@ export default function SmartDocPage() {
               <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 font-headline">System Details</h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-default">
-                  <Layers className="w-4 h-4" />
-                  <span>ChromaDB Vector Store</span>
+                  <Layers className="w-4 h-4 text-emerald-500/70" />
+                  <span>TF-IDF Semantic Retrieval</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-default">
-                  <Info className="w-4 h-4" />
-                  <span>Recursive RAG Pipeline</span>
+                  <Info className="w-4 h-4 text-emerald-500/70" />
+                  <span>Groq LLaMA-3.3 70B Engine</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-default">
+                  <Sparkles className="w-4 h-4 text-emerald-500/70" />
+                  <span>RAG Pipeline — FastAPI + Next.js</span>
                 </div>
               </div>
             </section>
@@ -76,7 +80,7 @@ export default function SmartDocPage() {
 
         <div className="p-6 border-t border-border mt-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] px-1.5 py-0">v1.2.4</Badge>
+            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] px-1.5 py-0">v2.0.0</Badge>
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Stable</span>
           </div>
           <a href="#" className="text-muted-foreground hover:text-emerald-500 transition-colors">

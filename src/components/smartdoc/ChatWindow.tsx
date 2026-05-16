@@ -16,15 +16,11 @@ export function ChatWindow({ docId }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // Anchor div at the bottom of the message list for reliable auto-scroll
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth"
-      });
-    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
   const handleSend = async () => {
@@ -93,7 +89,7 @@ export function ChatWindow({ docId }: ChatWindowProps) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 p-6" viewportRef={scrollRef}>
+      <ScrollArea className="flex-1 p-6">
         <div className="max-w-3xl mx-auto">
           {messages.length === 0 && (
             <div className="py-12 text-center text-muted-foreground">
@@ -115,6 +111,8 @@ export function ChatWindow({ docId }: ChatWindowProps) {
                </div>
             </div>
           )}
+          {/* Invisible anchor element — scroll target for auto-scroll to bottom */}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
 

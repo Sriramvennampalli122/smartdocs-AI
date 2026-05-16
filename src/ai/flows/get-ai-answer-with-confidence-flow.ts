@@ -1,86 +1,70 @@
 
 'use server';
 /**
- * @fileOverview A Genkit flow for asking questions about an uploaded document.
+ * @fileOverview Calls the Python backend which handles TF-IDF retrieval
+ * + Groq LLM generation. Returns a structured answer with sources.
  */
 
-import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const GetAiAnswerWithConfidenceInputSchema = z.object({
-  question: z.string().describe('The user’s question about the document.'),
-  docId: z.string().describe('The unique identifier of the uploaded document.'),
+  question: z.string(),
+  docId: z.string(),
 });
 export type GetAiAnswerWithConfidenceInput = z.infer<typeof GetAiAnswerWithConfidenceInputSchema>;
 
-const GetAiAnswerWithConfidenceOutputSchema = z.object({
-  answer: z.string().describe('The AI-generated answer to the question.'),
-  confidence: z.number().min(0.0).max(1.0).describe('A numerical confidence score (0.0 to 1.0) for the answer.'),
-  confidenceLabel: z.enum(['High', 'Medium', 'Low']).describe('A human-readable label for the confidence score.'),
-  hallucinationRisk: z.enum(['Safe', 'Uncertain', 'Risky']).describe('An assessment of the hallucination risk for the answer.'),
-  sources: z.array(z.object({
-    text: z.string().describe('The text content of the source chunk.'),
-    page: z.number().int().describe('The page number from which the source chunk was extracted.'),
-  })).describe('An array of source passages from the document used to generate the answer.'),
-});
-export type GetAiAnswerWithConfidenceOutput = z.infer<typeof GetAiAnswerWithConfidenceOutputSchema>;
-
-const getAiAnswerWithConfidenceFlow = ai.defineFlow(
-  {
-    name: 'getAiAnswerWithConfidenceFlow',
-    inputSchema: GetAiAnswerWithConfidenceInputSchema,
-    outputSchema: GetAiAnswerWithConfidenceOutputSchema,
-  },
-  async (input) => {
-    const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
-    const baseUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
-    const askEndpoint = `${baseUrl}/ask`;
-    
-    console.log(`[SmartDoc AI] Sending query to: ${askEndpoint}`);
-
-    try {
-      const response = await fetch(askEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question: input.question, doc_id: input.docId }),
-        signal: AbortSignal.timeout(60000), // 60s timeout for RAG search
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(`Backend Response Error (${response.status}): ${errorData.message || 'Unknown error'}`);
-      }
-
-      const result = await response.json();
-      
-      return {
-        answer: result.answer || '',
-        confidence: result.confidence ?? 0,
-        confidenceLabel: (result.confidence_label || result.confidenceLabel || 'Medium') as 'High' | 'Medium' | 'Low',
-        hallucinationRisk: (result.hallucination_risk || result.hallucinationRisk || 'Uncertain') as 'Safe' | 'Uncertain' | 'Risky',
-        sources: (result.sources || []).map((s: any) => ({
-          text: s.text || '',
-          page: s.page ?? s.page_number ?? 1
-        })),
-      };
-    } catch (error: any) {
-      console.error(`[SmartDoc AI] Query Error:`, error);
-
-      if (error.code === 'ECONNREFUSED' || error.message.includes('fetch failed')) {
-        throw new Error(
-          `CONNECTION REFUSED: Could not reach the backend for analysis at ${askEndpoint}. ` +
-          `Check your Python server logs and ensure it is bound to 127.0.0.1:8000.`
-        );
-      }
-      throw new Error(`Analysis failed: ${error.message}`);
-    }
-  }
-);
+export type GetAiAnswerWithConfidenceOutput = {
+  answer: string;
+  confidence: number;
+  confidenceLabel: 'High' | 'Medium' | 'Low';
+  hallucinationRisk: 'Safe' | 'Uncertain' | 'Risky';
+  sources: { text: string; page: number }[];
+};
 
 export async function getAiAnswerWithConfidence(
   input: GetAiAnswerWithConfidenceInput
 ): Promise<GetAiAnswerWithConfidenceOutput> {
-  return getAiAnswerWithConfidenceFlow(input);
+  const rawBackendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8001';
+  const baseUrl = rawBackendUrl.endsWith('/') ? rawBackendUrl.slice(0, -1) : rawBackendUrl;
+  const askEndpoint = `${baseUrl}/ask`;
+
+  console.log(`[SmartDoc AI] Sending query to: ${askEndpoint}`);
+
+  try {
+    const response = await fetch(askEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: input.question, doc_id: input.docId }),
+      signal: AbortSignal.timeout(90000),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(
+        `Backend Error (${response.status}): ${errorData.detail || errorData.message || response.statusText}`
+      );
+    }
+
+    const result = await response.json();
+    console.log(`[SmartDoc AI] Got answer (${result.answer?.length ?? 0} chars)`);
+
+    return {
+      answer: result.answer || 'No answer generated.',
+      confidence: result.confidence ?? 0,
+      confidenceLabel: (result.confidence_label || 'Medium') as 'High' | 'Medium' | 'Low',
+      hallucinationRisk: (result.hallucination_risk || 'Uncertain') as 'Safe' | 'Uncertain' | 'Risky',
+      sources: (result.sources || []).map((s: any) => ({
+        text: s.text || '',
+        page: s.page ?? 1,
+      })),
+    };
+  } catch (error: any) {
+    console.error(`[SmartDoc AI] Query Error:`, error);
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+      throw new Error(
+        `Cannot connect to backend at ${askEndpoint}. Make sure the Python server is running with: npm run backend`
+      );
+    }
+    throw new Error(`Analysis failed: ${error.message}`);
+  }
 }

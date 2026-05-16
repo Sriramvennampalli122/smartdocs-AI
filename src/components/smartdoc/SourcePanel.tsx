@@ -34,7 +34,7 @@ export function SourcePanel({ sources }: SourcePanelProps) {
                     </Badge>
                   </div>
                   <p className="text-xs leading-relaxed text-muted-foreground group-hover:text-foreground transition-colors">
-                    "{source.text.length > 250 ? `${source.text.substring(0, 250)}...` : source.text}"
+                    "{source.text.length > 250 ? source.text.substring(0, 250) + '...' : source.text}"
                   </p>
                 </div>
               ))}

@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/get-ai-answer-with-confidence-flow.ts';
-import '@/ai/flows/upload-and-process-document.ts';
+// Note: flows are now plain Next.js server actions, not Genkit flows.
+// The genkit.ts plugin is used only by /api/generate route.
+import '@/ai/genkit';
